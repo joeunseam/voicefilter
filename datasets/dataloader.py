@@ -83,8 +83,8 @@ class VFDataset(Dataset):
             mixed_mag = torch.load(self.mixed_mag_list[idx])
             return dvec_mel, target_mag, mixed_mag
         else:
-            target_wav, _ = librosa.load(self.target_wav_list[idx], self.hp.audio.sample_rate)
-            mixed_wav, _ = librosa.load(self.mixed_wav_list[idx], self.hp.audio.sample_rate)
+            target_wav, _ = librosa.load(self.target_wav_list[idx], sr=self.hp.audio.sample_rate)
+            mixed_wav, _ = librosa.load(self.mixed_wav_list[idx], sr=self.hp.audio.sample_rate)
             target_mag, _ = self.wav2magphase(self.target_wav_list[idx])
             mixed_mag, mixed_phase = self.wav2magphase(self.mixed_wav_list[idx])
             target_mag = torch.from_numpy(target_mag)
@@ -93,6 +93,6 @@ class VFDataset(Dataset):
             return dvec_mel, target_wav, mixed_wav, target_mag, mixed_mag, mixed_phase
 
     def wav2magphase(self, path):
-        wav, _ = librosa.load(path, self.hp.audio.sample_rate)
+        wav, _ = librosa.load(path, sr=self.hp.audio.sample_rate)
         mag, phase = self.audio.wav2spec(wav)
         return mag, phase
