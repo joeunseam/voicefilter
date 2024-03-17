@@ -86,6 +86,12 @@ def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp,
                 # 1. save checkpoint file to resume training
                 # 2. evaluate and save sample to tensorboard
                 if step % hp.train.checkpoint_interval == 0:
+                    # 이전 체크포인트 삭제 추가 (직전 파일은 제외)
+                    prev_checkpoint_path = os.path.join(pt_dir, 'chkpt_%d.pt' % (step - hp.train.checkpoint_interval*2))
+                    if os.path.exists(prev_checkpoint_path):
+                      os.remove(prev_checkpoint_path)
+                    # --------------------------------------
+                    
                     save_path = os.path.join(pt_dir, 'chkpt_%d.pt' % step)
                     torch.save({
                         'model': model.state_dict(),
