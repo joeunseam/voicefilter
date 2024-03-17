@@ -41,7 +41,7 @@ train:
   checkpoint_interval: 1000
 ---
 log:
-  chkpt_dir: 'chkpt'
+  chkpt_dir: '/content/drive/MyDrive/my_voicefilter/ckpt'
   log_dir: 'logs'
 ---
 embedder: # d-vector embedder. don't fix it!
