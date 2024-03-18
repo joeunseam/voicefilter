@@ -21,6 +21,8 @@ if __name__ == '__main__':
                         help="path of checkpoint pt file")
     parser.add_argument('-m', '--model', type=str, required=True,
                         help="Name of the model. Used for both logging and saving checkpoints.")
+    parser.add_argument('-ep', '--epochs', type=int, default=10000,
+                        help="Number of training epochs") # 에포크 수정1/6
     args = parser.parse_args()
 
     hp = HParam(args.config)
@@ -35,6 +37,8 @@ if __name__ == '__main__':
     os.makedirs(log_dir, exist_ok=True)
 
     chkpt_path = args.checkpoint_path if args.checkpoint_path is not None else None
+
+    n_epochs = args.epochs # 에포크 수정2/6
 
     logging.basicConfig(
         level=logging.INFO,
@@ -56,4 +60,4 @@ if __name__ == '__main__':
     trainloader = create_dataloader(hp, args, train=True)
     testloader = create_dataloader(hp, args, train=False)
 
-    train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str)
+    train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str, n_epochs) # 에포크 수정3/6
