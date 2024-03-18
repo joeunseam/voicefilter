@@ -11,7 +11,7 @@ from model.model import VoiceFilter
 from model.embedder import SpeechEmbedder
 
 
-def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str):
+def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str, n_epochs): # 에포크 수정4/6
     # load embedder
     embedder_pt = torch.load(args.embedder_path)
     embedder = SpeechEmbedder(hp).cuda()
@@ -47,7 +47,8 @@ def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp,
 
     try:
         criterion = nn.MSELoss()
-        while True:
+        for epoch in range(1, n_epochs +1): # 에포크 수정5/6
+            logger.info(f"----- Epoch {epoch} starts -----") # 에포크 수정6/6
             model.train()
             for dvec_mels, target_mag, mixed_mag in trainloader:
                 target_mag = target_mag.cuda()
