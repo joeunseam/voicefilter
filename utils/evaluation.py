@@ -35,3 +35,5 @@ def validate(audio, model, embedder, testloader, writer, step):
             break
 
     model.train()
+
+    return test_loss
