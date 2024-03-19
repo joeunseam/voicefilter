@@ -23,6 +23,12 @@ if __name__ == '__main__':
                         help="Name of the model. Used for both logging and saving checkpoints.")
     parser.add_argument('-ep', '--epochs', type=int, default=10000,
                         help="Number of training epochs") # 에포크 수정1/6
+    parser.add_argument('-p', '--early_stop_patience', type=int, default=3,
+                        help="Number of early stop patience") # 얼리스탑 수정
+    parser.add_argument('-d', '--ealry_stop_delta', type=float, default=0.00001,
+                        help="Delta value of early stop") # 얼리스탑 수정
+    parser.add_argument('-em', '--early_stop_mode', type=bool, default=False,
+                        help="early stop mode") # 얼리스탑 수정
     args = parser.parse_args()
 
     hp = HParam(args.config)
@@ -39,6 +45,10 @@ if __name__ == '__main__':
     chkpt_path = args.checkpoint_path if args.checkpoint_path is not None else None
 
     n_epochs = args.epochs # 에포크 수정2/6
+
+    early_stop_patience = args.early_stop_patience
+    early_stop_delta = args.ealry_stop_delta
+    early_stop_mode = args.early_stop_mode
 
     logging.basicConfig(
         level=logging.INFO,
@@ -60,4 +70,4 @@ if __name__ == '__main__':
     trainloader = create_dataloader(hp, args, train=True)
     testloader = create_dataloader(hp, args, train=False)
 
-    train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str, n_epochs) # 에포크 수정3/6
+    train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str, n_epochs, early_stop_mode, early_stop_patience, early_stop_delta) # 에포크 수정3/6
