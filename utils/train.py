@@ -12,7 +12,7 @@ from model.embedder import SpeechEmbedder
 from .early_stopping import EarlyStopping
 
 
-def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str, n_epochs): # 에포크 수정4/6
+def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str, n_epochs, early_stop_mode, early_stop_patience, early_stop_delta): # 에포크 수정4/6 및 매개변수 추가
     # load embedder
     embedder_pt = torch.load(args.embedder_path)
     embedder = SpeechEmbedder(hp).cuda()
@@ -47,17 +47,14 @@ def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp,
         logger.info("Starting new training run")
 
     try:
-        early_stop_mode = True
-        ealry_stop_patience = 3
-        early_stop_delta = 0.00001
-        # validation_intervals = cheackpoint_intervals
+        # 얼리스탑 모드일 시 얼리스탑 객체 생성
         if early_stop_mode:
             early_stopping = EarlyStopping(
-            patience=ealry_stop_patience,
+            patience=early_stop_patience,
             delta=early_stop_delta,
             )
-        pre_step = 0
-        early_stop = False
+        pre_step = 0 # 이전 체크포인트 삭제 위해 필요
+        early_stop = False # 나중에 얼리스탑 체크하여 설정함
 
         criterion = nn.MSELoss()
         for epoch in range(1, n_epochs +1): # 에포크 수정5/6
@@ -97,17 +94,19 @@ def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp,
                     writer.log_training(loss, step)
                     logger.info("Wrote summary at step %d" % step)
 
-                validation_loss = validate(audio, model, embedder, testloader, writer, step)
+                validation_loss = validate(audio, model, embedder, testloader, writer, step) # 검증
 
-                if step == 1 or step % hp.train.checkpoint_interval == 0:
+                if step == 1 or step % hp.train.checkpoint_interval == 0: # 체크포인트 저장 시기
+                   # validation_intervals = cheackpoint_intervals
                 
-                    if early_stop_mode:
+                    if early_stop_mode: # 얼리스탑 모드일 시 얼리스탑 확인
                         num = 0
                         message, early_stop, num = early_stopping.check_and_save(validation_loss, model)
 
                     # 1. save checkpoint file to resume training
                     # 2. evaluate and save sample to tensorboard
-                    if (not early_stop_mode) or num == 2:
+                    if (not early_stop_mode) or num == 2: # 얼리스탑 모드가 아니거나 얼리스탑 모드에서 체크포인트 저장이 필요하실 시
+                        # 체크 포인트 저장
                         save_path = os.path.join(pt_dir, 'chkpt_%d.pt' % step)
                         torch.save({
                             'model': model.state_dict(),
@@ -129,7 +128,7 @@ def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp,
                         pre_step = step
                         # --------------------------------------
 
-                    if early_stop:
+                    if early_stop: # 얼리스탑 중단이 필요할 시 예외발생
                       raise Exception("early_stop")  
                     
     except Exception as e:
