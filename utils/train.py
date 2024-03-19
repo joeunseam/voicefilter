@@ -9,6 +9,7 @@ from .audio import Audio
 from .evaluation import validate
 from model.model import VoiceFilter
 from model.embedder import SpeechEmbedder
+from .early_stopping import EarlyStopping
 
 
 def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp, hp_str, n_epochs): # 에포크 수정4/6
@@ -46,6 +47,18 @@ def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp,
         logger.info("Starting new training run")
 
     try:
+        early_stop_mode = True
+        ealry_stop_patience = 3
+        early_stop_delta = 0.00001
+        # validation_intervals = cheackpoint_intervals
+        if early_stop_mode:
+            early_stopping = EarlyStopping(
+            patience=ealry_stop_patience,
+            delta=early_stop_delta,
+            )
+        pre_step = 0
+        early_stop = False
+
         criterion = nn.MSELoss()
         for epoch in range(1, n_epochs +1): # 에포크 수정5/6
             logger.info(f"----- Epoch {epoch} starts -----") # 에포크 수정6/6
@@ -76,7 +89,7 @@ def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp,
 
                 loss = loss.item()
                 if loss > 1e8 or math.isnan(loss):
-                    logger.error("Loss exploded to %.02f at step %d!" % (loss, step))
+                    logger.error("Loss exploded to %.02f at step %d!" % (loss, step), step)
                     raise Exception("Loss exploded")
 
                 # write loss to tensorboard
@@ -84,24 +97,41 @@ def train(args, pt_dir, chkpt_path, trainloader, testloader, writer, logger, hp,
                     writer.log_training(loss, step)
                     logger.info("Wrote summary at step %d" % step)
 
-                # 1. save checkpoint file to resume training
-                # 2. evaluate and save sample to tensorboard
-                if step % hp.train.checkpoint_interval == 0:
-                    # 이전 체크포인트 삭제 추가 (직전 파일은 제외)
-                    prev_checkpoint_path = os.path.join(pt_dir, 'chkpt_%d.pt' % (step - hp.train.checkpoint_interval*2))
-                    if os.path.exists(prev_checkpoint_path):
-                      os.remove(prev_checkpoint_path)
-                    # --------------------------------------
+                validation_loss = validate(audio, model, embedder, testloader, writer, step)
+
+                if step == 1 or step % hp.train.checkpoint_interval == 0:
+                
+                    if early_stop_mode:
+                        num = 0
+                        message, early_stop, num = early_stopping.check_and_save(validation_loss, model)
+
+                    # 1. save checkpoint file to resume training
+                    # 2. evaluate and save sample to tensorboard
+                    if (not early_stop_mode) or num == 2:
+                        save_path = os.path.join(pt_dir, 'chkpt_%d.pt' % step)
+                        torch.save({
+                            'model': model.state_dict(),
+                            'optimizer': optimizer.state_dict(),
+                            'step': step,
+                            'hp_str': hp_str,
+                        }, save_path)
+                        logger.info("Saved checkpoint to: %s" % save_path)
+                        
+                        logger.info(f"Step {step:>3}] "
+                                    f"T_loss: {loss:7.5f}, "
+                                    f"V_loss: {validation_loss:7.5f}")
+                        if early_stop_mode: logger.info(f"{message}")
+
+                        # 이전 체크포인트 삭제 추가 (직전 파일은 제외)
+                        prev_checkpoint_path = os.path.join(pt_dir, 'chkpt_%d.pt' % pre_step)
+                        if os.path.exists(prev_checkpoint_path):
+                          os.remove(prev_checkpoint_path)
+                        pre_step = step
+                        # --------------------------------------
+
+                    if early_stop:
+                      raise Exception("early_stop")  
                     
-                    save_path = os.path.join(pt_dir, 'chkpt_%d.pt' % step)
-                    torch.save({
-                        'model': model.state_dict(),
-                        'optimizer': optimizer.state_dict(),
-                        'step': step,
-                        'hp_str': hp_str,
-                    }, save_path)
-                    logger.info("Saved checkpoint to: %s" % save_path)
-                    validate(audio, model, embedder, testloader, writer, step)
     except Exception as e:
         logger.info("Exiting due to exception: %s" % e)
         traceback.print_exc()
