@@ -23,7 +23,6 @@ def vad_merge(w):
         temp.append(w[s:e])
     return np.concatenate(temp, axis=None)
 
-
 def mix(hp, args, audio, num, s1_dvec, s1_target, s2, train):
     srate = hp.audio.sample_rate
     dir_ = os.path.join(args.out_dir, 'train' if train else 'test')
@@ -79,6 +78,30 @@ def mix(hp, args, audio, num, s1_dvec, s1_target, s2, train):
     with open(dvec_text_path, 'w') as f:
         f.write(s1_dvec)
 
+train_spk = []
+test_spk = []
+def train_wrapper(arguments): # 매개변수 수정
+    hp, args, audio, train_spk, num = arguments # 본래 전역변수 사용했던 것을 전부 인자로 받도록 수정
+    spk1, spk2 = random.sample(train_spk, 2)
+    spk1_dir = os.path.dirname(spk1) # my code
+    file_spk1 = [os.path.join(spk1_dir, file) for file in os.listdir(spk1_dir) if file.endswith(".wav")] # my code
+
+    s1_dvec, s1_target = random.sample(file_spk1, 2) # spk1 수정
+    s2 = spk2
+
+    mix(hp, args, audio, num, s1_dvec, s1_target, s2, train=True)
+
+def test_wrapper(arguments):
+    hp, args, audio, test_spk, num = arguments
+    spk1, spk2 = random.sample(test_spk, 2)
+    spk1_dir = os.path.dirname(spk1) # my code
+    file_spk1 = [os.path.join(spk1_dir, file) for file in os.listdir(spk1_dir) if file.endswith(".wav")] # my code
+
+    s1_dvec, s1_target = random.sample(file_spk1, 2)
+    s2 = spk2
+
+    mix(hp, args, audio, num, s1_dvec, s1_target, s2, train=False)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -109,8 +132,7 @@ if __name__ == '__main__':
 
     if args.libri_dir is not None:
         train_folders = [x for x in glob.glob(os.path.join(args.libri_dir, 'train-clean-100', '*'))
-                            if os.path.isdir(x)] + \
-                        [x for x in glob.glob(os.path.join(args.libri_dir, 'train-clean-360', '*'))
+                            if os.path.isdir(x)] + [x for x in glob.glob(os.path.join(args.libri_dir, 'train-clean-360', '*'))
                             if os.path.isdir(x)]
                         # we recommned to exclude train-other-500
                         # See https://github.com/mindslab-ai/voicefilter/issues/5#issuecomment-497746793
@@ -125,7 +147,6 @@ if __name__ == '__main__':
         train_folders = all_folders[:-20]
         test_folders = all_folders[-20:]
 
-    train_spk = []
     for folder in train_folders:
         for subdir, _, files in os.walk(folder):
             for file in files:
@@ -135,7 +156,7 @@ if __name__ == '__main__':
     #                for spk in train_folders]
     train_spk = [x for x in train_spk if len(x) >= 2]
 
-    test_spk = []
+
     for folder in test_folders:
         for subdir, _, files in os.walk(folder):
             for file in files:
@@ -144,33 +165,21 @@ if __name__ == '__main__':
     #test_spk = [glob.glob(os.path.join(spk, '**', hp.form.input), recursive=True)
     #                for spk in test_folders]
     test_spk = [x for x in test_spk if len(x) >= 2]
+    """
+    train_spk = [glob.glob(os.path.join(spk, '**', hp.form.input), recursive=True)
+                 for spk in train_folders]
+    train_spk = [x for x in train_spk if len(x) >= 2]
 
+    test_spk = [glob.glob(os.path.join(spk, '**', hp.form.input), recursive=True)
+                for spk in test_folders]
+    test_spk = [x for x in test_spk if len(x) >= 2]
+    """
     audio = Audio(hp)
 
-    def train_wrapper(num):
-        spk1, spk2 = random.sample(train_spk, 2)
-        spk1_dir = os.path.dirname(spk1) # my code
-        file_spk1 = [os.path.join(spk1_dir, file) for file in os.listdir(spk1_dir) if file.endswith(".wav")] # my code
-        
-        s1_dvec, s1_target = random.sample(file_spk1, 2) # spk1 수정
-        s2 = spk2
-
-        mix(hp, args, audio, num, s1_dvec, s1_target, s2, train=True)
-
-    def test_wrapper(num):
-        spk1, spk2 = random.sample(test_spk, 2)
-        spk1_dir = os.path.dirname(spk1) # my code
-        file_spk1 = [os.path.join(spk1_dir, file) for file in os.listdir(spk1_dir) if file.endswith(".wav")] # my code
-        
-        s1_dvec, s1_target = random.sample(file_spk1, 2)
-        s2 = spk2
-
-        mix(hp, args, audio, num, s1_dvec, s1_target, s2, train=False)
-
     arr = list(range(10))
-    with Pool(cpu_num) as p:
-        r = list(tqdm.tqdm(p.imap(train_wrapper, arr), total=len(arr)))
+    with Pool(cpu_num) as p:  # 함수를 위로 빼냈으니, 함수에서 사용 하는 변수들 인자로 보내도록 수정
+        r = list(tqdm.tqdm(p.imap(train_wrapper, [(hp, args, audio, train_spk, i) for i in arr]), total=len(arr)))
 
     arr = list(range(5))
     with Pool(cpu_num) as p:
-        r = list(tqdm.tqdm(p.imap(test_wrapper, arr), total=len(arr)))
+        r = list(tqdm.tqdm(p.imap(test_wrapper, [(hp, args, audio, test_spk, i) for i in arr]), total=len(arr)))
