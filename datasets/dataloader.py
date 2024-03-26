@@ -6,29 +6,30 @@ from torch.utils.data import Dataset, DataLoader
 
 from utils.audio import Audio
 
+def train_collate_fn(batch): # 내부함수에서 외부함수로 변경 (멀티프로세싱 오류 때문)
+    dvec_list = list()
+    target_mag_list = list()
+    mixed_mag_list = list()
 
+    for dvec_mel, target_mag, mixed_mag in batch:
+        # Convert to float32  <- 여기서 부터 추가
+        dvec_mel = dvec_mel.to(torch.float32)
+        target_mag = target_mag.to(torch.float32)
+        mixed_mag = mixed_mag.to(torch.float32)
+        # -------------------------------------- 여기까지
+        dvec_list.append(dvec_mel)
+        target_mag_list.append(target_mag)
+        mixed_mag_list.append(mixed_mag)
+    target_mag_list = torch.stack(target_mag_list, dim=0)
+    mixed_mag_list = torch.stack(mixed_mag_list, dim=0)
+
+    return dvec_list, target_mag_list, mixed_mag_list
+
+
+def test_collate_fn(batch): # 내부함수에서 외부함수로 변경 (멀티프로세싱 오류 때문)
+    return batch
 def create_dataloader(hp, args, train):
-    def train_collate_fn(batch):
-        dvec_list = list()
-        target_mag_list = list()
-        mixed_mag_list = list()
 
-        for dvec_mel, target_mag, mixed_mag in batch:
-            # Convert to float32  <- 여기서 부터 추가
-            dvec_mel = dvec_mel.to(torch.float32)
-            target_mag = target_mag.to(torch.float32)
-            mixed_mag = mixed_mag.to(torch.float32)
-            # -------------------------------------- 여기까지
-            dvec_list.append(dvec_mel)
-            target_mag_list.append(target_mag)
-            mixed_mag_list.append(mixed_mag)
-        target_mag_list = torch.stack(target_mag_list, dim=0)
-        mixed_mag_list = torch.stack(mixed_mag_list, dim=0)
-
-        return dvec_list, target_mag_list, mixed_mag_list
-
-    def test_collate_fn(batch):
-        return batch
 
     if train:
         return DataLoader(dataset=VFDataset(hp, args, True),
